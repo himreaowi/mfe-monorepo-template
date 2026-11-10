@@ -55,16 +55,16 @@ and `inputClassName` / `selectClassName` / `textAreaClassName` style the control
 
 Shell building blocks:
 
-| Export                        | Notes                                                                                                                       |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `ThemeToggle`                 | Light / Dark / Use system theme (needs a `ThemeProvider` above)                                                             |
-| `SkipLink`                    | "Skip to main content": first Tab stop, visible on focus, focuses the target without a URL change (`targetId`, `children`)  |
-| `Brand`                       | the app name in a header: one line, ellipsis on screen, full accessible name (any `<div>` props, `className`)               |
-| `useMenuDisclosure()`         | headless Menu button + panel/drawer: state, `buttonProps`, `panelProps`, Escape / outside click / link / back-forward close |
-| `useFitLayout(options)`       | measures whether a row (header) fits: `'wide' \| 'compact'`, so a layout collapses behind "Menu" exactly when needed        |
-| `RemoteFallback`              | `role="alert"` panel; optional `onRetry` adds a "Try again" button                                                          |
-| `ConnectionRequired`          | Offline banner (`visible`; a shell passes `!useOnlineStatus()` from `@org/pwa`)                                             |
-| `ThemeProvider`, `useTheme()` | Light/dark/system theme, sets `data-theme` on `<html>`                                                                      |
+| Export                        | Notes                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ThemeToggle`                 | Light / Dark / Use system theme (needs a `ThemeProvider` above)                                                                 |
+| `SkipLink`                    | "Skip to main content": first Tab stop, visible on focus, focuses the target without a URL change (`targetId`, `children`)      |
+| `Brand`                       | the app name in a header: one line, ellipsis on screen, full accessible name (any `<div>` props, `className`)                   |
+| `MenuDisclosure`              | Menu button + panel/drawer on Base UI Collapsible (`Root`/`Button`/`Panel`): Escape / outside click / link / back-forward close |
+| `useFitLayout(options)`       | measures whether a row (header) fits: `'wide' \| 'compact'`, so a layout collapses behind "Menu" exactly when needed            |
+| `RemoteFallback`              | `role="alert"` panel; optional `onRetry` adds a "Try again" button                                                              |
+| `ConnectionRequired`          | Offline banner (`visible`; a shell passes `!useOnlineStatus()` from `@org/pwa`)                                                 |
+| `ThemeProvider`, `useTheme()` | Light/dark/system theme, sets `data-theme` on `<html>`                                                                          |
 
 ```tsx
 import { Alert, Button, Select, TextField } from '@org/ui';
@@ -165,25 +165,27 @@ at the repo root, `top` and `side`); in short:
 ```tsx
 const mainId = useId();
 const sizerRef = useRef<HTMLDivElement>(null);
-const menu = useMenuDisclosure();
-const { setOpen } = menu;
-const onChange = useCallback((next: FitLayout) => next === 'wide' && setOpen(false), [setOpen]);
+const headerRef = useRef<HTMLElement>(null);
+const buttonRef = useRef<HTMLButtonElement>(null);
+const panelRef = useRef<HTMLDivElement>(null);
+const [open, setOpen] = useState(false);
+const onChange = useCallback((next: FitLayout) => next === 'wide' && setOpen(false), []);
 const layout = useFitLayout({
-  container: menu.containerRef, sizer: sizerRef, panel: menu.panelRef,
-  button: menu.buttonRef, open: menu.open, onChange,
+  container: headerRef, sizer: sizerRef, panel: panelRef, button: buttonRef, open, onChange,
 });
 
 <SkipLink targetId={mainId} />
-<header ref={menu.containerRef} className={styles.header} data-layout={layout}>
+<MenuDisclosure.Root ref={headerRef} open={open} onOpenChange={setOpen}
+  render={<header className={styles.header} data-layout={layout} />}>
   <div ref={sizerRef} className={styles.sizer} aria-hidden="true" />
   <Brand className={styles.brand}>{APP_TITLE}</Brand>
-  <button {...menu.buttonProps} className={styles.menuButton}>Menu</button>
-  <div {...menu.panelProps} className={menu.open ? `${styles.panel} ${styles.open}` : styles.panel}>
+  <MenuDisclosure.Button ref={buttonRef} className={styles.menuButton}>Menu</MenuDisclosure.Button>
+  <MenuDisclosure.Panel ref={panelRef} className={open ? `${styles.panel} ${styles.open}` : styles.panel}>
     <nav aria-label="Main">…</nav>
     <ThemeToggle />
     <UserMenu />
-  </div>
-</header>
+  </MenuDisclosure.Panel>
+</MenuDisclosure.Root>
 <main id={mainId} tabIndex={-1}>…</main>
 ```
 
@@ -232,31 +234,23 @@ always stay fully visible.
   truncates too. A padding/negative-margin pair keeps a focused brand link's focus ring inside the
   clipped box.
 
-### `useMenuDisclosure()`
+### `MenuDisclosure`
 
-The WAI-ARIA disclosure for a "Menu" button and the panel or drawer it shows; markup and styles
-stay in the layout.
+The WAI-ARIA disclosure (non-modal) for a "Menu" button and the panel or drawer it shows, on Base
+UI Collapsible; styles stay in the layout. `Root` (`open` + `onOpenChange`, controlled; `render`
+e.g. `<header />`; `ref`) wraps `Button` and `Panel` (both take `ref` and their element's props).
 
-```ts
-const menu = useMenuDisclosure<TPanel = HTMLDivElement, TContainer = HTMLElement>();
-menu.open; menu.setOpen(v); menu.toggle(); menu.close(restoreFocus?);
-menu.buttonProps  // { ref, type: 'button', 'aria-expanded', 'aria-controls', onClick }
-menu.panelProps   // { ref, id, onClick }
-menu.containerRef // optional: the element around both (e.g. <header>)
-menu.buttonRef; menu.panelRef; menu.panelId;
-```
-
-- the button gets `aria-expanded` and `aria-controls` (the panel's generated `id`); render the
-  panel `display: none` while closed, so it is out of the tab order and the accessibility tree;
+- the button gets `type="button"`, `aria-expanded` and `aria-controls` (the panel's `id`);
+- the panel stays mounted and never gets `hidden`: render it `display: none` while closed (out of
+  the tab order and the accessibility tree), or inline when the layout is wide;
 - **Escape** closes it and returns focus to the button;
-- a **pointer down outside** `containerRef` (or, without it, outside button and panel) closes it
-  and leaves focus where the user put it;
+- a **pointer down outside** `Root` closes it and leaves focus where the user put it;
 - a **followed link inside the panel** (a click on `a[href]`, also Enter on a link) and
   **browser back/forward** (`popstate`) close it;
 - a **click on a control marked `data-menu-close`** inside the panel closes it (Sign in and Sign
   out in `UserMenu` use this);
 - closing while focus is inside the panel moves focus to the button (never lost on `<body>`);
-- listeners are attached only while it is open.
+- listeners are attached only while it is open; no `<style>` elements (strict CSP).
 
 ### `useFitLayout(options)`
 
