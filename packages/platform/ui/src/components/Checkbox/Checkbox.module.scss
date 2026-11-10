@@ -38,22 +38,23 @@
   }
 
   // the hidden native input sits between the box and the text
-  &[data-disabled] ~ .indicator {
-    display: flex;
-
-    svg {
-      width: 0.875rem;
-      height: 0.875rem;
-      fill: none;
-      stroke: currentcolor;
-      stroke-width: 2.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-  }
-
-  .text {
+  &[data-disabled],
+  &[data-disabled] ~ .text {
     opacity: 0.6;
+  }
+}
+
+.indicator {
+  display: flex;
+
+  svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 }
 

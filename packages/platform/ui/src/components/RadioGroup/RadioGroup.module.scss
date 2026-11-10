@@ -15,8 +15,8 @@
 }
 
 .legend {
+  // a <div> (Base UI Fieldset.Legend) in the flex column: the group's gap spaces it
   padding: 0;
-  margin-bottom: var(--space-1);
   font-weight: 600;
 }
 
@@ -84,6 +84,7 @@
   }
 
   // the hidden native radio sits between the circle and the text
+  &[data-disabled],
   &[data-disabled] ~ .text {
     opacity: 0.6;
   }
