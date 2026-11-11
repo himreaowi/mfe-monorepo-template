@@ -1,0 +1,134 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {
+  AuthProvider,
+  useAuth,
+  type AuthClient,
+  type AuthSession,
+} from '@org/auth';
+import { ThemeProvider } from '@org/ui';
+import type { SignInMode } from '@/core/constants/signIn';
+import { SignInGate } from './SignInGate';
+
+jest.mock('@org/pwa', () => ({ useOnlineStatus: () => true }));
+
+/** A client whose session check resolves when `resolve()` is called. */
+function client(initial: AuthSession) {
+  let session = initial;
+  let resolve: () => void = () => undefined;
+  const pending = new Promise<void>((r) => {
+    resolve = r;
+  });
+  const signIn = jest.fn(async () => {
+    session = { status: 'signedIn', user: { id: 'u1', name: 'Ada' } };
+    return session;
+  });
+  const auth: AuthClient = {
+    kind: 'bff',
+    getSession: async () => {
+      await pending;
+      return session;
+    },
+    signIn,
+    signOut: async () => {
+      session = { status: 'signedOut' };
+      return session;
+    },
+  };
+  return { auth, signIn, resolve };
+}
+
+/** The portal, with a sign-out button standing in for the header's user menu. */
+function Portal() {
+  const { signOut } = useAuth();
+  return (
+    <>
+      <p>portal</p>
+      <button type="button" onClick={() => void signOut()}>
+        Sign out
+      </button>
+    </>
+  );
+}
+
+function renderGate(
+  auth: AuthClient | null,
+  { required = true, mode = 'landing' as SignInMode } = {},
+) {
+  return render(
+    <ThemeProvider>
+      <AuthProvider client={auth}>
+        <SignInGate required={required} mode={mode}>
+          <Portal />
+        </SignInGate>
+      </AuthProvider>
+    </ThemeProvider>,
+  );
+}
+
+describe('SignInGate', () => {
+  it('not required: renders the portal right away', () => {
+    renderGate(client({ status: 'signedOut' }).auth, { required: false });
+    expect(screen.getByText('portal')).toBeInTheDocument();
+  });
+
+  it('spinner while the session is checked, never the portal', async () => {
+    const c = client({ status: 'signedOut' });
+    renderGate(c.auth);
+    expect(screen.getByTestId('sign-in-gate-busy')).toHaveTextContent(
+      'Checking sign-in',
+    );
+    expect(screen.queryByText('portal')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+    c.resolve();
+    expect(await screen.findByTestId('landing-page')).toBeInTheDocument();
+  });
+
+  it('landing: brand-only header, sign in shows the portal', async () => {
+    const c = client({ status: 'signedOut' });
+    c.resolve();
+    renderGate(c.auth);
+    await screen.findByTestId('landing-page');
+    expect(screen.queryByText('portal')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('banner').querySelectorAll('button, a'),
+    ).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(c.signIn).toHaveBeenCalledWith(undefined);
+    expect(await screen.findByText('portal')).toBeInTheDocument();
+  });
+
+  it.each<SignInMode>(['landing', 'redirect'])(
+    'signed in (%s): the portal; signing out shows the landing page again',
+    async (mode) => {
+      const c = client({ status: 'signedIn', user: { id: 'u1', name: 'Ada' } });
+      c.resolve();
+      renderGate(c.auth, { mode });
+      expect(await screen.findByText('portal')).toBeInTheDocument();
+      expect(screen.queryByTestId('landing-page')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+      expect(await screen.findByTestId('landing-page')).toBeInTheDocument();
+      expect(screen.queryByText('portal')).not.toBeInTheDocument();
+      // no bounce back into sign-on after an explicit sign-out
+      expect(c.signIn).not.toHaveBeenCalled();
+    },
+  );
+
+  it('redirect: calls signIn right away (spinner meanwhile)', async () => {
+    const c = client({ status: 'signedOut' });
+    c.resolve();
+    renderGate(c.auth, { mode: 'redirect' });
+    expect(await screen.findByText('portal')).toBeInTheDocument();
+    expect(c.signIn).toHaveBeenCalled();
+    expect(screen.queryByTestId('landing-page')).not.toBeInTheDocument();
+  });
+
+  it('sign-in not configured: fails closed (landing page without a button)', () => {
+    renderGate(null, { mode: 'redirect' });
+    expect(screen.getByTestId('landing-page')).toHaveTextContent(
+      'not configured',
+    );
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByText('portal')).not.toBeInTheDocument();
+  });
+});
