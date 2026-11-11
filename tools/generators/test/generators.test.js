@@ -1200,8 +1200,14 @@ describe('gen:shell --sign-in-required', () => {
     const open = await generateShell({ root, zone: 'intranet' });
     assert.equal(open.signInRequired, false);
     const openFile = read(root, `apps/intranet/intranet/shell/${SIGN_IN}`);
-    assert.match(openFile, /^export const SIGN_IN_REQUIRED = false as boolean;$/m);
-    assert.match(openFile, /^export const SIGN_IN_MODE = 'landing' as SignInMode;$/m);
+    assert.match(
+      openFile,
+      /^export const SIGN_IN_REQUIRED = false as boolean;$/m,
+    );
+    assert.match(
+      openFile,
+      /^export const SIGN_IN_MODE = 'landing' as SignInMode;$/m,
+    );
 
     const r = await generateShell({
       root,
@@ -1237,7 +1243,16 @@ describe('gen:shell --sign-in-required', () => {
     const root = tempWorkspace();
     const out = execFileSync(
       process.execPath,
-      [BIN, 'shell', 'internet', '--sign-in-required', '--sign-in-mode', 'redirect', '--root', root],
+      [
+        BIN,
+        'shell',
+        'internet',
+        '--sign-in-required',
+        '--sign-in-mode',
+        'redirect',
+        '--root',
+        root,
+      ],
       { encoding: 'utf8' },
     );
     assert.match(out, /sign-in required \(redirect\)/);
@@ -1266,7 +1281,10 @@ describe('gen:shell --sign-in-required', () => {
         assert.match(/** @type {any} */ (e).stderr, message);
       }
     }
-    assert.ok(!fs.existsSync(path.join(root, 'apps/intranet')), 'nothing written');
+    assert.ok(
+      !fs.existsSync(path.join(root, 'apps/intranet')),
+      'nothing written',
+    );
   });
 });
 
