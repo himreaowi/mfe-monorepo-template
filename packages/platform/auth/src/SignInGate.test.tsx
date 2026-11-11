@@ -1,16 +1,9 @@
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {
-  AuthProvider,
-  useAuth,
-  type AuthClient,
-  type AuthSession,
-} from '@org/auth';
-import { ThemeProvider } from '@org/ui';
-import type { SignInMode } from '@/core/constants/signIn';
+import { AuthProvider, useAuth } from './AuthProvider';
 import { SignInGate } from './SignInGate';
-
-jest.mock('@org/pwa', () => ({ useOnlineStatus: () => true }));
+import type { AuthClient, AuthSession } from './types';
 
 /** A client whose session check resolves when `resolve()` is called. */
 function client(initial: AuthSession) {
@@ -51,18 +44,43 @@ function Portal() {
   );
 }
 
+function Landing() {
+  const auth = useAuth();
+  return (
+    <section data-testid="landing">
+      {auth.status === 'disabled' ? (
+        'unavailable'
+      ) : (
+        <button type="button" onClick={() => void auth.signIn()}>
+          Sign in
+        </button>
+      )}
+    </section>
+  );
+}
+
+function Layout({ children }: { children: ReactNode }) {
+  return <main data-testid="signed-out-layout">{children}</main>;
+}
+
 function renderGate(
   auth: AuthClient | null,
-  { required = true, mode = 'landing' as SignInMode } = {},
+  {
+    required = true,
+    mode = 'landing',
+  }: { required?: boolean; mode?: 'landing' | 'redirect' } = {},
 ) {
   return render(
-    <ThemeProvider>
-      <AuthProvider client={auth}>
-        <SignInGate required={required} mode={mode}>
-          <Portal />
-        </SignInGate>
-      </AuthProvider>
-    </ThemeProvider>,
+    <AuthProvider client={auth}>
+      <SignInGate
+        required={required}
+        mode={mode}
+        landing={<Landing />}
+        layout={Layout}
+      >
+        <Portal />
+      </SignInGate>
+    </AuthProvider>,
   );
 }
 
@@ -72,63 +90,80 @@ describe('SignInGate', () => {
     expect(screen.getByText('portal')).toBeInTheDocument();
   });
 
-  it('spinner while the session is checked, never the portal', async () => {
+  it('spinner inside the layout while the session is checked, never the portal', async () => {
     const c = client({ status: 'signedOut' });
     renderGate(c.auth);
+    expect(screen.getByTestId('signed-out-layout')).toContainElement(
+      screen.getByTestId('sign-in-gate-busy'),
+    );
     expect(screen.getByTestId('sign-in-gate-busy')).toHaveTextContent(
       'Checking sign-in',
     );
     expect(screen.queryByText('portal')).not.toBeInTheDocument();
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
     c.resolve();
-    expect(await screen.findByTestId('landing-page')).toBeInTheDocument();
+    expect(await screen.findByTestId('landing')).toBeInTheDocument();
   });
 
-  it('landing: brand-only header, sign in shows the portal', async () => {
+  it('landing: sign in shows the portal', async () => {
     const c = client({ status: 'signedOut' });
     c.resolve();
     renderGate(c.auth);
-    await screen.findByTestId('landing-page');
+    await screen.findByTestId('landing');
     expect(screen.queryByText('portal')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('banner').querySelectorAll('button, a'),
-    ).toHaveLength(0);
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(c.signIn).toHaveBeenCalledWith(undefined);
     expect(await screen.findByText('portal')).toBeInTheDocument();
+    expect(screen.queryByTestId('signed-out-layout')).not.toBeInTheDocument();
   });
 
-  it.each<SignInMode>(['landing', 'redirect'])(
+  it.each(['landing', 'redirect'] as const)(
     'signed in (%s): the portal; signing out shows the landing page again',
     async (mode) => {
       const c = client({ status: 'signedIn', user: { id: 'u1', name: 'Ada' } });
       c.resolve();
       renderGate(c.auth, { mode });
       expect(await screen.findByText('portal')).toBeInTheDocument();
-      expect(screen.queryByTestId('landing-page')).not.toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-      expect(await screen.findByTestId('landing-page')).toBeInTheDocument();
+      expect(await screen.findByTestId('landing')).toBeInTheDocument();
       expect(screen.queryByText('portal')).not.toBeInTheDocument();
-      // no bounce back into sign-on after an explicit sign-out
+      // no bounce back into single sign-on after an explicit sign-out
       expect(c.signIn).not.toHaveBeenCalled();
     },
   );
 
-  it('redirect: calls signIn right away (spinner meanwhile)', async () => {
+  it('redirect: calls signIn right away', async () => {
     const c = client({ status: 'signedOut' });
     c.resolve();
     renderGate(c.auth, { mode: 'redirect' });
     expect(await screen.findByText('portal')).toBeInTheDocument();
-    expect(c.signIn).toHaveBeenCalled();
-    expect(screen.queryByTestId('landing-page')).not.toBeInTheDocument();
+    expect(c.signIn).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('landing')).not.toBeInTheDocument();
   });
 
-  it('sign-in not configured: fails closed (landing page without a button)', () => {
+  it('redirect: BFF error shows the landing page (no redirect loop)', async () => {
+    const c = client({
+      status: 'signedOut',
+      error: { code: 'network', message: 'down' },
+    });
+    c.resolve();
+    renderGate(c.auth, { mode: 'redirect' });
+    expect(await screen.findByTestId('landing')).toBeInTheDocument();
+    expect(c.signIn).not.toHaveBeenCalled();
+  });
+
+  it('sign-in not configured: fails closed', () => {
     renderGate(null, { mode: 'redirect' });
-    expect(screen.getByTestId('landing-page')).toHaveTextContent(
-      'not configured',
-    );
-    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+    expect(screen.getByTestId('landing')).toHaveTextContent('unavailable');
     expect(screen.queryByText('portal')).not.toBeInTheDocument();
+  });
+
+  it('no layout: renders the signed-out content bare', () => {
+    render(
+      <AuthProvider client={null}>
+        <SignInGate required mode="landing" landing={<p>landing</p>}>
+          <p>portal</p>
+        </SignInGate>
+      </AuthProvider>,
+    );
+    expect(screen.getByText('landing')).toBeInTheDocument();
   });
 });

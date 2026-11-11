@@ -1224,15 +1224,18 @@ describe('gen:shell --sign-in-required', () => {
     // the gate wraps the routes; landing page, layout and e2e follow the constants
     assert.match(
       read(root, `${dir}/src/app/App.tsx`),
-      /<SignInGate required=\{SIGN_IN_REQUIRED\} mode=\{SIGN_IN_MODE\}>/,
+      /<SignInGate\s+required=\{SIGN_IN_REQUIRED\}\s+mode=\{SIGN_IN_MODE\}\s+landing=\{<LandingPage \/>\}\s+layout=\{SignedOutLayout\}\s*>/,
     );
     for (const f of [
       'src/pages/LandingPage/LandingPage.tsx',
-      'src/components/SignInGate/SignInGate.tsx',
       'e2e/sign-in-required.spec.ts',
     ]) {
       assert.ok(fs.existsSync(path.join(root, dir, f)), `missing ${f}`);
     }
+    // the gate's logic is one copy in @org/auth, not in each shell
+    assert.ok(
+      !fs.existsSync(path.join(root, dir, 'src/components/SignInGate')),
+    );
     assert.match(
       read(root, `${dir}/src/layouts/ShellLayout/ShellLayout.tsx`),
       /export function SignedOutLayout[\s\S]*SIGNED-OUT HEADER: brand only/,

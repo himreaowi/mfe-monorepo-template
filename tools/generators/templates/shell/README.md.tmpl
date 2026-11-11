@@ -65,7 +65,7 @@ repo root. The header shows `UserMenu` (Sign in / name + Sign out).
 
 `src/core/constants/signIn.ts` (generated: required `__SIGN_IN_REQUIRED__`, mode
 `__SIGN_IN_MODE__`; `pnpm gen:shell --sign-in-required [--sign-in-mode landing|redirect]`):
-with `SIGN_IN_REQUIRED = true`, `src/components/SignInGate` hides the whole portal until the
+with `SIGN_IN_REQUIRED = true`, `SignInGate` from `@org/auth` (in `src/app/App.tsx`) hides the whole portal until the
 user is signed in: a spinner while the session is checked, then a brand-only header
 (`SignedOutLayout` in `src/layouts/ShellLayout`; its "SIGNED-OUT HEADER" comment says how to
 re-enable the theme toggle) and `src/pages/LandingPage` (`landing`) or the sign-in page

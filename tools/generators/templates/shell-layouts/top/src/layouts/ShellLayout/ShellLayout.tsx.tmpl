@@ -107,7 +107,7 @@ export function ShellLayout({ remotes }: { remotes: RemoteEntry[] }) {
 
 /**
  * The chrome while signed out of a shell that requires sign-in (SIGN_IN_REQUIRED,
- * src/core/constants/signIn.ts; rendered by src/components/SignInGate): skip link, a header with
+ * src/core/constants/signIn.ts; passed to `SignInGate` from @org/auth in src/app/App.tsx): skip link, a header with
  * the brand only, offline banner and `<main>` with the spinner or the landing page. No nav and
  * no remotes. The saved theme still applies (ThemeProvider is above this).
  */

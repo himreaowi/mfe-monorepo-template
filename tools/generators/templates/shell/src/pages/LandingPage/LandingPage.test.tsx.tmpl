@@ -1,11 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AuthProvider, type AuthClient, type AuthSession } from '@org/auth';
+import {
+  AuthProvider,
+  SignInGate,
+  type AuthClient,
+  type AuthSession,
+} from '@org/auth';
+import { ThemeProvider } from '@org/ui';
+import { APP_TITLE } from '@/core/constants/app';
 import {
   LANDING_SIGN_IN_LABEL,
   LANDING_TITLE,
 } from '@/core/constants/signIn';
+import { SignedOutLayout } from '@/layouts/ShellLayout/ShellLayout';
 import { LandingPage } from './LandingPage';
+
+jest.mock('@org/pwa', () => ({ useOnlineStatus: () => true }));
 
 function client(session: AuthSession): AuthClient & { signIn: jest.Mock } {
   return {
@@ -45,5 +55,39 @@ describe('LandingPage', () => {
       'not configured',
     );
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+describe('LandingPage in SignInGate (as in src/app/App.tsx)', () => {
+  it('signed out: brand-only header and the landing page; signed in: the portal', async () => {
+    const auth = client({ status: 'signedOut' });
+    auth.signIn.mockResolvedValue({
+      status: 'signedIn',
+      user: { id: 'u1', name: 'Ada' },
+    });
+    render(
+      <ThemeProvider>
+        <AuthProvider client={auth}>
+          <SignInGate
+            required
+            mode="landing"
+            landing={<LandingPage />}
+            layout={SignedOutLayout}
+          >
+            <p>portal</p>
+          </SignInGate>
+        </AuthProvider>
+      </ThemeProvider>,
+    );
+    expect(await screen.findByTestId('landing-page')).toBeInTheDocument();
+    expect(screen.getByTestId('header-brand')).toHaveTextContent(APP_TITLE);
+    expect(
+      screen.getByRole('banner').querySelectorAll('button, a, input'),
+    ).toHaveLength(0);
+    expect(screen.queryByText('portal')).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: LANDING_SIGN_IN_LABEL }),
+    );
+    expect(await screen.findByText('portal')).toBeInTheDocument();
   });
 });

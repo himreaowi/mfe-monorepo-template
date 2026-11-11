@@ -33,7 +33,6 @@
     "componentDuplicatesAllowed": {
       "RemoteNav": "Generated into every shell by gen:shell; each shell owns and edits its copy.",
       "StartupError": "Generated into every shell by gen:shell; each shell owns and edits its copy.",
-      "SignInGate": "Generated into every shell by gen:shell; each shell owns and edits its copy.",
       "Welcome": "Generated into every shell by gen:shell; each shell owns and edits its copy.",
       "AddItemForm": "Sample code generated into every remote by gen:remote; replace it with the app's own code.",
       "Demo": "Sample code generated into every remote by gen:remote; replace it with the app's own code.",

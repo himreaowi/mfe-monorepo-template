@@ -45,7 +45,7 @@ comma-separated: `--shell citizen,business`).
   "Layout: the shell owns it". `gen:remote --layout` is an error (the shell owns the layout).
 - **`--sign-in-required [--sign-in-mode landing|redirect]`** (`gen:shell`, default off = open
   portal): writes `SIGN_IN_REQUIRED` / `SIGN_IN_MODE` to the shell's
-  `src/core/constants/signIn.ts` (with the landing texts). Required: `src/components/SignInGate`
+  `src/core/constants/signIn.ts` (with the landing texts). Required: `SignInGate` from `@org/auth` (in `src/app/App.tsx`)
   shows a spinner, then a brand-only header (`SignedOutLayout`) with `src/pages/LandingPage`
   (`landing`) or goes straight to sign-in (`redirect`); no nav, remote or remote code before
   sign-in. `--sign-in-mode` without `--sign-in-required` or with another value is an error; on

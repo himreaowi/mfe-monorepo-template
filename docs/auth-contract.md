@@ -208,8 +208,10 @@ BFF is failing (no redirect loop).
 
 A shell generated with `pnpm gen:shell <zone> [<name>] --sign-in-required [--sign-in-mode
 landing|redirect]` (or with `SIGN_IN_REQUIRED = true` in its `src/core/constants/signIn.ts`,
-fixed at build time) shows nothing of the portal before sign-in. Its `SignInGate`
-(`src/components/SignInGate`) wraps the routes:
+fixed at build time) shows nothing of the portal before sign-in. `src/app/App.tsx` wraps the
+routes in `<SignInGate required mode landing={<LandingPage />} layout={SignedOutLayout}>` from
+`@org/auth` (the logic, one copy for every shell; landing page and signed-out layout are the
+shell's own):
 
 - While the session is checked (and while the browser goes to `loginUrl`): a spinner, never
   the portal.
